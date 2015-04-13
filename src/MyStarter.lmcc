@@ -1,0 +1,1865 @@
+M_PROMPT         EQU 30
+M_QUIT           EQU 31
+M_LOADDEV        EQU 32
+M_LOADBL         EQU 33
+M_LOADRL         EQU 34
+M_LOADLL         EQU 35
+M_LOAD           EQU 36
+M_MOVE           EQU 37
+M_RUN            EQU 38
+M_DUMP_CMOS      EQU 39
+M_DUMP           EQU 40
+M_ASM            EQU 41
+M_DASM           EQU 42
+M_INTERPRET      EQU 43
+M_HELP           EQU 44
+M_CC             EQU 45
+M_CAT            EQU 46
+M_MKBOOT         EQU 47
+VIEWBL           EQU 48
+VIEWRL           EQU 49
+VIEWLL           EQU 50
+                 // 새로운 명령어의 추가는
+                 // 1. memory/roms/monitor.h에 MONITOR_XXXX 부분을 찾아 
+                 //    새로운 코드 번호를 추가한다.
+                 //    예>
+                 //      80번줄  MONITOR_GREP   51
+                 // 2. memory/roms/monitor.c 파일에서
+                 //    BEGIN_COMPARE() ~ END_COMPARE() 사이에
+                 //    COMPARE("명령어",MONITOR_XXXX) 를 추가한다.
+                 //    예>
+                 //     108번줄  COMPARE("GREP",MONITOR_GREP)
+
+                 // MyStart 시작
+MYSTARTER        START  2000
+MONITOR_ENTRY	 INTON
+
+
+                 LD   SP #STACK_BTM
+PROMPT           LD   A #BUF // BUFFER 주소
+                 LD   X #=C'20103390' // PROMPT 문자열 주소.
+                 INT  M_PROMPT
+                 LD   X A // Return value X에 저장
+                 SUB  X #31 // PROMPT는 INT값을 반환 
+                            // 31부터시작함으로 31을 뺀다.
+                            // M_PROMPT가 30임으로 31부터...
+                 LD   C X
+                 ADD  X C
+                 ADD  X C // 3X, 3BOX Indexing
+                 LD   A #BUF
+                 PUSH A
+                 CALL NEAR @MONITOR_TABLE
+                 ADD  SP #2
+                 JUMP NEAR PROMPT
+
+MONITOR_TABLE    INT M_QUIT
+                 RET
+                 NOP
+                 INT M_LOADDEV
+                 RET
+                 NOP
+                 INT M_LOADBL
+                 RET
+                 NOP
+                 INT M_LOADRL
+                 RET
+                 NOP
+                 INT M_LOADLL
+                 RET
+                 NOP
+                 INT M_LOAD
+                 RET
+                 NOP
+                 INT M_MOVE
+                 RET
+                 NOP
+                 INT M_RUN
+                 RET
+                 NOP
+                 INT M_DUMP_CMOS
+                 RET
+                 NOP
+                 INT M_DUMP
+                 RET
+                 NOP
+                 INT M_ASM
+                 RET
+                 NOP
+                 INT M_DASM
+                 RET
+                 NOP
+                 INT M_INTERPRET
+                 RET
+                 NOP
+                 INT M_HELP
+                 RET
+                 NOP
+                 INT M_CC
+                 RET
+                 NOP
+                 INT M_CAT
+                 RET
+                 NOP
+                 INT M_MKBOOT
+                 RET
+     		 NOP
+                 
+                 JUMP NEAR MY_VIEWBL
+		 NOP
+                 JUMP NEAR MY_VIEWRL
+		 NOP
+                 JUMP NEAR MY_VIEWLL
+                 NOP
+
+
+PTR_PRNT	RESDBOX	1
+CMD		RESBOX	6
+ARG1		RESBOX	4
+ARG2		RESBOX	4
+SET_TAPE	RESDBOX	1
+TAPE_LENG	RESDBOX	1
+
+MY_VIEWBL       NOP  //@@@@@@@@@@@@VIEW_BL_START@@@@@@@@
+//		#pragma C { 
+//               char* cmd  = strtok(BUF);  // "VIEW"
+//                 char* arg1 = strtok(BUF);  // "BL"
+//                 char* arg2 = strtok(BUF); // "50";
+//		}
+		LD	X #0
+		LD	B #0
+BL_CMD_LOOP	LD 	A @BUF
+		SHL	A #4
+		SHR	A #4
+		ST	A %CMD
+
+		ADD	X #1
+		ADD	B #1
+		
+		SUB	A #32
+		JZ	BL_ARG1_LOOP_I
+		JUMP 	BL_CMD_LOOP
+
+BL_ARG1_LOOP_I	SUB	B #1
+		ST	A %CMD
+		LD	B #0
+BL_ARG1_LOOP	LD      A @BUF
+		SHL	A #4
+		SHR	A #4
+                ST      A %ARG1
+
+                ADD     X #1
+		ADD	B #1
+
+		SUB	A #32
+                JZ      BL_ARG2_LOOP_I
+                JUMP 	BL_ARG1_LOOP
+
+BL_ARG2_LOOP_I	SUB	B #1
+		ST	A %ARG1
+		LD	B #0
+BL_ARG2_LOOP    LD      A @BUF  
+		SHL	A #4
+		SHR	A #4
+                ST      A %ARG2
+
+                ADD     X #1
+		ADD	B #1
+
+		SUB	A #0
+		JZ	BL_BUF_0END
+		SUB	A #32
+                JZ 	BL_BUF__END    
+                JUMP 	BL_ARG2_LOOP
+
+
+
+BL_BUF__END	SUB	B #1
+		ST	A %ARG2
+BL_BUF_0END	LD	A ARG2
+		SHL	A #4
+		SHR	A #4
+		SUB	A #48
+		ST	A SET_TAPE
+	
+		LD	X #=C'% CASSETTE NO. '
+		ST	X PTR_PRNT
+
+		LD	X #0
+BL_PRNT_ARG1	LD	A *@PTR_PRNT		
+		SHL	A #4
+		SHR	A #4
+		OUT	13
+
+		ADD	X #1
+		SUB	A #0
+		JZ	BL_ARG1_END
+		JUMP	BL_PRNT_ARG1
+BL_ARG1_END	NOP
+		
+		LD	A SET_TAPE
+		OUT	12
+		LD	A #10
+		OUT	13
+
+//following is like absloader(st->out)
+		LD	A #0
+		LD	C #10
+BL_TAPE_MULT	ADD	A SET_TAPE
+		JLOOP	BL_TAPE_MULT
+
+		ST	A SET_TAPE
+		LD	D SET_TAPE
+		SUB	D #30
+		JZ	BL_3
+		SUB	D #10
+		JZ	BL_4
+                SUB     D #10
+                JZ      BL_5
+                SUB     D #10
+                JZ      BL_6
+                SUB     D #10
+                JZ      BL_7
+                SUB     D #10
+                JZ      BL_8
+                SUB     D #10
+                JZ      BL_9
+		CALL 	ERR_MSG
+		RET
+		
+BL_3		TIO	30 // BL_3 START /////////////
+		IN	30
+		OUT	13
+		SUB	A #72
+		JZ	B3_OK
+		CALL 	ERR_MSG
+		RET // ERR OCCURED, 'VIEW BL'END //
+	
+B3_OK		LD	A #32
+		OUT	13
+
+		LD	C #10
+B3_NAME		IN	30
+		OUT	13
+		JLOOP 	B3_NAME
+
+		CALL 	STA_MSG
+		IN	30
+		LD	D A
+		IN	30
+		OUT	12
+		LD	A #58
+		OUT	13
+		LD	A D
+		OUT 	12
+		
+		CALL	LEN_MSG
+		IN	30
+		ST	A TAPE_LENG
+		LD	D A
+		IN	30
+		ST	A TAPE_LENG+1
+		OUT	12
+		LD	A #58
+		OUT	13
+		LD	A D
+		OUT 	12
+		LD 	C TAPE_LENG
+	
+		LD	D #0	
+B3_TAPE_PRNT	JN	B3_TAPE_LOOP
+		LD	D #0
+		LD	A #10
+		OUT	13
+B3_TAPE_LOOP	LD	A #32
+		OUT	13
+		IN	30
+		OUT 	12
+
+		ADD	D #1
+		LD	A D
+		SUB	A #10
+		JLOOP	B3_TAPE_PRNT	
+
+		LD	A #10
+		OUT	13
+		IN	30
+		OUT	13
+		LD	A #32
+		OUT	13
+		IN	30
+		LD	D A
+		IN	30
+		OUT	12
+		LD	A #58
+		OUT	13
+		LD	A D
+		OUT	12	
+		LD	A #10
+		OUT	13
+		
+		JUMP	BL_SWCH_END // BL_3 END //////
+
+BL_4		TIO	40 // BL_4 START /////////////
+		IN	40
+		OUT	13
+		SUB	A #72
+		JZ	B4_OK
+		CALL 	ERR_MSG
+		RET // ERR OCCURED, 'VIEW BL'END //
+	
+B4_OK		LD	A #32
+		OUT	13
+
+		LD	C #10
+B4_NAME		IN	40
+		OUT	13
+		JLOOP 	B4_NAME
+
+		CALL 	STA_MSG
+		IN	40
+		LD	D A
+		IN	40
+		OUT	12
+		LD	A #58
+		OUT	13
+		LD	A D
+		OUT 	12
+		
+		CALL	LEN_MSG
+		IN	40
+		ST	A TAPE_LENG
+		LD	D A
+		IN	40
+		ST	A TAPE_LENG+1
+		OUT	12
+		LD	A #58
+		OUT	13
+		LD	A D
+		OUT 	12
+
+		LD 	C TAPE_LENG
+	
+		LD	D #0	
+B4_TAPE_PRNT	JN	B4_TAPE_LOOP
+		LD	D #0
+		LD	A #10
+		OUT	13
+B4_TAPE_LOOP	LD	A #32
+		OUT	13
+		IN	40
+		OUT 	12
+
+		ADD	D #1
+		LD	A D
+		SUB	A #10
+		JLOOP	B4_TAPE_PRNT	
+
+		LD	A #10
+		OUT	13
+		IN	40
+		OUT	13
+		LD	A #32
+		OUT	13
+		IN	40
+		LD	D A
+		IN	40
+		OUT	12
+		LD	A #58
+		OUT	13
+		LD	A D
+		OUT	12	
+		LD	A #10
+		OUT	13
+		
+		JUMP	BL_SWCH_END // BL_4 END //////
+
+BL_5		TIO	50 // BL_5 START /////////////
+		IN	50
+		OUT	13
+		SUB	A #72
+		JZ	B5_OK
+		CALL 	ERR_MSG
+		RET // ERR OCCURED, 'VIEW BL'END //
+	
+B5_OK		LD	A #32
+		OUT	13
+
+		LD	C #10
+B5_NAME		IN	50
+		OUT	13
+		JLOOP 	B5_NAME
+
+		CALL 	STA_MSG
+		IN	50
+		LD	D A
+		IN	50
+		OUT	12
+		LD	A #58
+		OUT	13
+		LD	A D
+		OUT 	12
+		
+		CALL	LEN_MSG
+		IN	50
+		ST	A TAPE_LENG
+		LD	D A
+		IN	50
+		ST	A TAPE_LENG+1
+		OUT	12
+		LD	A #58
+		OUT	13
+		LD	A D
+		OUT 	12
+
+		LD 	C TAPE_LENG
+	
+		LD	D #0	
+B5_TAPE_PRNT	JN	B5_TAPE_LOOP
+		LD	D #0
+		LD	A #10
+		OUT	13
+B5_TAPE_LOOP	LD	A #32
+		OUT	13
+		IN	50
+		OUT 	12
+
+		ADD	D #1
+		LD	A D
+		SUB	A #10
+		JLOOP	B5_TAPE_PRNT
+
+		LD	A #10
+		OUT	13
+		IN	50
+		OUT	13
+		LD	A #32
+		OUT	13
+		IN	50
+		LD	D A
+		IN	50
+		OUT	12
+		LD	A #58
+		OUT	13
+		LD	A D
+		OUT	12	
+		LD	A #10
+		OUT	13
+	
+		JUMP	BL_SWCH_END // BL_5 END //////
+
+
+BL_6		TIO     60 // BL_6 START /////////////
+                IN      60
+                OUT     13
+                SUB     A #72
+                JZ      B6_OK
+                CALL    ERR_MSG
+                RET // ERR OCCURED, 'VIEW BL'END //
+
+B6_OK           LD      A #32
+                OUT     13
+
+                LD      C #10
+B6_NAME         IN      60
+                OUT     13
+                JLOOP   B6_NAME
+
+                CALL    STA_MSG
+                IN      60
+                LD      D A
+                IN      60
+                OUT     12
+                LD      A #58
+                OUT     13
+                LD      A D
+                OUT     12
+
+                CALL    LEN_MSG
+                IN      60
+                ST      A TAPE_LENG
+                LD      D A
+                IN      60
+                ST      A TAPE_LENG+1
+                OUT     12
+                LD      A #58
+                OUT     13
+                LD      A D
+                OUT     12
+
+                LD      C TAPE_LENG
+
+                LD      D #0
+B6_TAPE_PRNT    JN      B6_TAPE_LOOP
+                LD      D #0
+                LD      A #10
+                OUT     13
+B6_TAPE_LOOP    LD      A #32
+                OUT     13
+                IN      60
+                OUT     12
+
+                ADD     D #1
+                LD      A D
+                SUB     A #10
+                JLOOP   B6_TAPE_PRNT    
+
+		LD	A #10
+		OUT	13
+		IN	60
+		OUT	13
+		LD	A #32
+		OUT	13
+		IN	60
+		LD	D A
+		IN	60
+		OUT	12
+		LD	A #58
+		OUT	13
+		LD	A D
+		OUT	12	
+		LD	A #10
+		OUT	13
+	
+                JUMP    BL_SWCH_END // BL_6 END //////
+
+BL_7		TIO     70 // BL_7 START /////////////
+                IN      70
+                OUT     13
+                SUB     A #72
+                JZ      B7_OK
+                CALL    ERR_MSG
+                RET // ERR OCCURED, 'VIEW BL'END //
+
+B7_OK           LD      A #32
+                OUT     13
+
+                LD      C #10
+B7_NAME         IN      70
+                OUT     13
+                JLOOP   B7_NAME
+
+                CALL    STA_MSG
+                IN      70
+                LD      D A
+                IN      70
+                OUT     12
+                LD      A #58
+                OUT     13
+                LD      A D
+                OUT     12
+
+                CALL    LEN_MSG
+                IN      70
+                ST      A TAPE_LENG
+                LD      D A
+                IN      70
+                ST      A TAPE_LENG+1
+                OUT     12
+                LD      A #58
+                OUT     13
+                LD      A D
+                OUT     12
+
+                LD      C TAPE_LENG
+
+                LD      D #0
+B7_TAPE_PRNT    JN      B7_TAPE_LOOP
+                LD      D #0
+                LD      A #10
+                OUT     13
+B7_TAPE_LOOP    LD      A #32
+                OUT     13
+                IN      70
+                OUT     12
+
+                ADD     D #1
+                LD      A D
+                SUB     A #10
+                JLOOP   B7_TAPE_PRNT    
+
+		LD	A #10
+		OUT	13
+		IN	70
+		OUT	13
+		LD	A #32
+		OUT	13
+		IN	70
+		LD	D A
+		IN	70
+		OUT	12
+		LD	A #58
+		OUT	13
+		LD	A D
+		OUT	12	
+		LD	A #10
+		OUT	13
+	
+                JUMP    BL_SWCH_END // BL_7 END //////
+
+BL_8		TIO     80 // BL_8 START /////////////
+                IN      80
+                OUT     13
+                SUB     A #72
+                JZ      B8_OK
+                CALL    ERR_MSG
+                RET // ERR OCCURED, 'VIEW BL'END //
+
+B8_OK           LD      A #32
+                OUT     13
+
+                LD      C #10
+B8_NAME         IN      80
+                OUT     13
+                JLOOP   B8_NAME
+
+                CALL    STA_MSG
+                IN      80
+                LD      D A
+                IN      80
+                OUT     12
+                LD      A #58
+                OUT     13
+                LD      A D
+                OUT     12
+
+                CALL    LEN_MSG
+                IN      80
+                ST      A TAPE_LENG
+                LD      D A
+                IN      80
+                ST      A TAPE_LENG+1
+                OUT     12
+                LD      A #58
+                OUT     13
+                LD      A D
+                OUT     12
+
+                LD      C TAPE_LENG
+
+                LD      D #0
+B8_TAPE_PRNT    JN      B8_TAPE_LOOP
+                LD      D #0
+                LD      A #10
+                OUT     13
+B8_TAPE_LOOP	LD      A #32
+                OUT     13
+                IN      80
+                OUT     12
+
+                ADD     D #1
+                LD      A D
+                SUB     A #10
+                JLOOP   B8_TAPE_PRNT    
+
+		LD	A #10
+		OUT	13
+		IN	80
+		OUT	13
+		LD	A #32
+		OUT	13
+		IN	80
+		LD	D A
+		IN	80
+		OUT	12
+		LD	A #58
+		OUT	13
+		LD	A D
+		OUT	12	
+		LD	A #10
+		OUT	13
+	
+                JUMP    BL_SWCH_END // BL_6 END //////
+
+BL_9		CALL    ERR_MSG
+                RET // ERR OCCURED, 'VIEW BL'END //
+
+	
+
+		
+BL_SWCH_END     RET ////////// 'VIEW BL' END //////////
+
+MY_VIEWRL       NOP //@@@@@@@@@@@@VIEW_RL_START@@@@@@@@
+//		#pragma C { 
+//               char* cmd  = strtok(BUF);  // "VIEW"
+//                 char* arg1 = strtok(BUF);  // "RL"
+//                 char* arg2 = strtok(BUF); // "50";
+//		}
+		LD	X #0
+		LD	B #0
+RL_CMD_LOOP	LD 	A @BUF
+		SHL	A #4
+		SHR	A #4
+		ST	A %CMD
+
+		ADD	X #1
+		ADD	B #1
+		
+		SUB	A #32
+		JZ	RL_ARG1_LOOP_I
+		JUMP 	RL_CMD_LOOP
+
+RL_ARG1_LOOP_I	SUB	B #1
+		ST	A %CMD
+		LD	B #0
+RL_ARG1_LOOP	LD      A @BUF
+		SHL	A #4
+		SHR	A #4
+                ST      A %ARG1
+
+                ADD     X #1
+		ADD	B #1
+
+		SUB	A #32
+                JZ      RL_ARG2_LOOP_I
+                JUMP 	RL_ARG1_LOOP
+
+RL_ARG2_LOOP_I	SUB	B #1
+		ST	A %ARG1
+		LD	B #0
+RL_ARG2_LOOP    LD      A @BUF  
+		SHL	A #4
+		SHR	A #4
+                ST      A %ARG2
+
+                ADD     X #1
+		ADD	B #1
+
+		SUB	A #0
+		JZ	RL_BUF_0END
+		SUB	A #32
+                JZ 	RL_BUF__END    
+                JUMP 	RL_ARG2_LOOP
+
+
+
+RL_BUF__END	SUB	B #1
+		ST	A %ARG2
+RL_BUF_0END	LD	A ARG2
+		SHL	A #4
+		SHR	A #4
+		SUB	A #48
+		ST	A SET_TAPE
+	
+		LD	X #=C'% CASSETTE NO. '
+		ST	X PTR_PRNT
+
+		LD	X #0
+RL_PRNT_ARG1	LD	A *@PTR_PRNT		
+		SHL	A #4
+		SHR	A #4
+		OUT	13
+
+		ADD	X #1
+		SUB	A #0
+		JZ	RL_ARG1_END
+		JUMP	RL_PRNT_ARG1
+RL_ARG1_END	NOP
+		
+		LD	A SET_TAPE
+		OUT	12
+		LD	A #10
+		OUT	13
+//following is like absloader(st->out)
+		LD	A #0
+		LD	C #10
+RL_TAPE_MULT	ADD	A SET_TAPE
+		JLOOP	RL_TAPE_MULT
+
+		ST	A SET_TAPE
+		LD	D SET_TAPE
+		SUB	D #30
+		JZ	RL_3
+		SUB	D #10
+		JZ	RL_4
+                SUB     D #10
+                JZ      RL_5
+                SUB     D #10
+                JZ      RL_6
+                SUB     D #10
+                JZ      RL_7
+                SUB     D #10
+                JZ      RL_8
+		CALL 	ERR_MSG
+		RET
+
+RL_T_TYP_LEN	RESDBOX	1
+
+RL_3		TIO	30 // RL_3 START /////////////
+		IN	30
+		OUT	13
+		SUB	A #72
+		JZ	R3_OK
+		CALL 	ERR_MSG
+		RET // ERR OCCURED, 'VIEW BL'END //
+	
+R3_OK		LD	A #32
+		OUT	13
+
+		LD	C #10
+R3_NAME		IN	30
+		OUT	13
+		JLOOP 	R3_NAME
+
+		CALL 	STA_MSG
+		IN	30
+		LD	D A
+		IN	30
+		OUT	12
+		LD	A #58
+		OUT	13
+		LD	A D
+		OUT 	12
+		
+		CALL	LEN_MSG
+		IN	30
+		ST	A TAPE_LENG
+		LD	D A
+		IN	30
+		ST	A TAPE_LENG+1
+		OUT	12
+		LD	A #58
+		OUT	13
+		LD	A D
+		OUT 	12
+		LD 	C TAPE_LENG // NAME,ST,LEN END
+
+
+		
+R3_TYP_SWCH	LD	A #10
+		OUT 	13
+			
+		IN	30
+		OUT	13		// GET TYPE
+		LD	D A		// SWITCH(CASE)
+
+		LD	A #32
+		OUT	13
+
+		LD 	A D
+		SUB	A #84
+		JZ	R3_T_TYP	// T-FORMAT
+
+		LD 	A D
+		SUB	A #77
+		JZ	R3_M_TYP	// M-FORMAT
+
+		LD 	A D
+		SUB	A #69
+		JZ	R3_E_TYP	// E-FORMAT
+
+		CALL 	ERR_MSG
+		RET			//WRONG FORMAT
+		
+R3_T_TYP	NOP	/////////T-FORMAT///////
+		IN	30
+		OUT	12
+
+		LD	A #32
+		OUT	13
+
+		IN	30
+		OUT	12
+
+		LD	A #32
+		OUT	13
+
+		IN	30
+		ST 	A RL_T_TYP_LEN
+		OUT	12
+
+		LD	C RL_T_TYP_LEN
+R3_T_TYP_LOP	NOP
+		LD	A #32
+		OUT	13
+		
+		IN	30
+		OUT	12
+
+		JLOOP	R3_T_TYP_LOP
+		JUMP	R3_TYP_SWCH	////////
+	
+R3_M_TYP	NOP	/////////M-FORMAT///////
+		
+		LD	C #3
+R3_M_TYP_LOP	IN	30
+		OUT	12
+		LD	A #32
+		OUT	13
+		JLOOP	R3_M_TYP_LOP
+		JUMP	R3_TYP_SWCH 	////////
+
+R3_E_TYP	NOP	/////////E-FORMAT///////
+
+		IN	30
+		LD	D A
+		IN	30
+		OUT	12
+
+		LD	A #58
+		OUT	13
+
+		LD	A D
+		OUT	12	
+
+		LD	A #10
+		OUT	13
+		
+		RET	//////// RL_3 END ////////////
+
+RL_4		TIO	40 // RL_4 START /////////////
+		IN	40
+		OUT	13
+		SUB	A #72
+		JZ	R4_OK
+		CALL 	ERR_MSG
+		RET // ERR OCCURED, 'VIEW BL'END //
+	
+R4_OK		LD	A #32
+		OUT	13
+
+		LD	C #10
+R4_NAME		IN	40
+		OUT	13
+		JLOOP 	R4_NAME
+
+		CALL 	STA_MSG
+		IN	40
+		LD	D A
+		IN	40
+		OUT	12
+		LD	A #58
+		OUT	13
+		LD	A D
+		OUT 	12
+		
+		CALL	LEN_MSG
+		IN	40
+		ST	A TAPE_LENG
+		LD	D A
+		IN	40
+		ST	A TAPE_LENG+1
+		OUT	12
+		LD	A #58
+		OUT	13
+		LD	A D
+		OUT 	12
+		LD 	C TAPE_LENG // NAME,ST,LEN END
+
+
+		
+R4_TYP_SWCH	LD	A #10
+		OUT 	13
+			
+		IN	40
+		OUT	13		// GET TYPE
+		LD	D A		// SWITCH(CASE)
+
+		LD	A #32
+		OUT	13
+
+		LD 	A D
+		SUB	A #84
+		JZ	R4_T_TYP	// T-FORMAT
+
+		LD 	A D
+		SUB	A #77
+		JZ	R4_M_TYP	// M-FORMAT
+
+		LD 	A D
+		SUB	A #69
+		JZ	R4_E_TYP	// E-FORMAT
+
+		CALL 	ERR_MSG
+		RET			//WRONG FORMAT
+		
+R4_T_TYP	NOP	/////////T-FORMAT///////
+		IN	40
+		OUT	12
+
+		LD	A #32
+		OUT	13
+
+		IN	40
+		OUT	12
+
+		LD	A #32
+		OUT	13
+
+		IN	40
+		ST 	A RL_T_TYP_LEN
+		OUT	12
+
+		LD	C RL_T_TYP_LEN
+R4_T_TYP_LOP	NOP
+		LD	A #32
+		OUT	13
+		
+		IN	40
+		OUT	12
+
+		JLOOP	R4_T_TYP_LOP
+		JUMP	R4_TYP_SWCH	////////
+	
+R4_M_TYP	NOP	/////////M-FORMAT///////
+		
+		LD	C #3
+R4_M_TYP_LOP	IN	40
+		OUT	12
+		LD	A #32
+		OUT	13
+		JLOOP	R4_M_TYP_LOP
+		JUMP	R4_TYP_SWCH 	////////
+
+R4_E_TYP	NOP	/////////E-FORMAT///////
+
+		IN	40
+		LD	D A
+		IN	40
+		OUT	12
+
+		LD	A #58
+		OUT	13
+
+		LD	A D
+		OUT	12	
+
+		LD	A #10
+		OUT	13
+		
+		RET	//////// RL_4 END ////////////
+
+RL_5		TIO	50 // RL_5 START /////////////
+		IN	50
+		OUT	13
+		SUB	A #72
+		JZ	R5_OK
+		CALL 	ERR_MSG
+		RET // ERR OCCURED, 'VIEW BL'END //
+	
+R5_OK		LD	A #32
+		OUT	13
+
+		LD	C #10
+R5_NAME		IN	50
+		OUT	13
+		JLOOP 	R5_NAME
+
+		CALL 	STA_MSG
+		IN	50
+		LD	D A
+		IN	50
+		OUT	12
+		LD	A #58
+		OUT	13
+		LD	A D
+		OUT 	12
+		
+		CALL	LEN_MSG
+		IN	50
+		ST	A TAPE_LENG
+		LD	D A
+		IN	50
+		ST	A TAPE_LENG+1
+		OUT	12
+		LD	A #58
+		OUT	13
+		LD	A D
+		OUT 	12
+		LD 	C TAPE_LENG // NAME,ST,LEN END
+
+
+		
+R5_TYP_SWCH	LD	A #10
+		OUT 	13
+			
+		IN	50
+		OUT	13		// GET TYPE
+		LD	D A		// SWITCH(CASE)
+
+		LD	A #32
+		OUT	13
+
+		LD 	A D
+		SUB	A #84
+		JZ	R5_T_TYP	// T-FORMAT
+
+		LD 	A D
+		SUB	A #77
+		JZ	R5_M_TYP	// M-FORMAT
+
+		LD 	A D
+		SUB	A #69
+		JZ	R5_E_TYP	// E-FORMAT
+
+		CALL 	ERR_MSG
+		RET			//WRONG FORMAT
+		
+R5_T_TYP	NOP	/////////T-FORMAT///////
+		IN	50
+		OUT	12
+
+		LD	A #32
+		OUT	13
+
+		IN	50
+		OUT	12
+
+		LD	A #32
+		OUT	13
+
+		IN	50
+		ST 	A RL_T_TYP_LEN
+		OUT	12
+
+		LD	C RL_T_TYP_LEN
+R5_T_TYP_LOP	NOP
+		LD	A #32
+		OUT	13
+		
+		IN	50
+		OUT	12
+
+		JLOOP	R5_T_TYP_LOP
+		JUMP	R5_TYP_SWCH	////////
+	
+R5_M_TYP	NOP	/////////M-FORMAT///////
+		
+		LD	C #3
+R5_M_TYP_LOP	IN	50
+		OUT	12
+		LD	A #32
+		OUT	13
+		JLOOP	R5_M_TYP_LOP
+		JUMP	R5_TYP_SWCH 	////////
+
+R5_E_TYP	NOP	/////////E-FORMAT///////
+
+		IN	50
+		LD	D A
+		IN	50
+		OUT	12
+
+		LD	A #58
+		OUT	13
+
+		LD	A D
+		OUT	12	
+
+		LD	A #10
+		OUT	13
+		
+		RET	//////// RL_5 END ////////////
+
+
+RL_6		TIO	60 // RL_6 START /////////////
+		IN	60
+		OUT	13
+		SUB	A #72
+		JZ	R6_OK
+		CALL 	ERR_MSG
+		RET // ERR OCCURED, 'VIEW BL'END //
+	
+R6_OK		LD	A #32
+		OUT	13
+
+		LD	C #10
+R6_NAME		IN	60
+		OUT	13
+		JLOOP 	R6_NAME
+
+		CALL 	STA_MSG
+		IN	60
+		LD	D A
+		IN	60
+		OUT	12
+		LD	A #58
+		OUT	13
+		LD	A D
+		OUT 	12
+		
+		CALL	LEN_MSG
+		IN	60
+		ST	A TAPE_LENG
+		LD	D A
+		IN	60
+		ST	A TAPE_LENG+1
+		OUT	12
+		LD	A #58
+		OUT	13
+		LD	A D
+		OUT 	12
+		LD 	C TAPE_LENG // NAME,ST,LEN END
+
+
+		
+R6_TYP_SWCH	LD	A #10
+		OUT 	13
+			
+		IN	60
+		OUT	13		// GET TYPE
+		LD	D A		// SWITCH(CASE)
+
+		LD	A #32
+		OUT	13
+
+		LD 	A D
+		SUB	A #84
+		JZ	R6_T_TYP	// T-FORMAT
+
+		LD 	A D
+		SUB	A #77
+		JZ	R6_M_TYP	// M-FORMAT
+
+		LD 	A D
+		SUB	A #69
+		JZ	R6_E_TYP	// E-FORMAT
+
+		CALL 	ERR_MSG
+		RET			//WRONG FORMAT
+		
+R6_T_TYP	NOP	/////////T-FORMAT///////
+		IN	60
+		OUT	12
+
+		LD	A #32
+		OUT	13
+
+		IN	60
+		OUT	12
+
+		LD	A #32
+		OUT	13
+
+		IN	60
+		ST 	A RL_T_TYP_LEN
+		OUT	12
+
+		LD	C RL_T_TYP_LEN
+R6_T_TYP_LOP	NOP
+		LD	A #32
+		OUT	13
+		
+		IN	60
+		OUT	12
+
+		JLOOP	R6_T_TYP_LOP
+		JUMP	R6_TYP_SWCH	////////
+	
+R6_M_TYP	NOP	/////////M-FORMAT///////
+		
+		LD	C #3
+R6_M_TYP_LOP	IN	60
+		OUT	12
+		LD	A #32
+		OUT	13
+		JLOOP	R6_M_TYP_LOP
+		JUMP	R6_TYP_SWCH 	////////
+
+R6_E_TYP	NOP	/////////E-FORMAT///////
+
+		IN	60
+		LD	D A
+		IN	60
+		OUT	12
+
+		LD	A #58
+		OUT	13
+
+		LD	A D
+		OUT	12	
+
+		LD	A #10
+		OUT	13
+		
+		RET	//////// RL_6 END ////////////
+
+
+RL_7		TIO	70 // RL_7 START /////////////
+		IN	70
+		OUT	13
+		SUB	A #72
+		JZ	R7_OK
+		CALL 	ERR_MSG
+		RET // ERR OCCURED, 'VIEW BL'END //
+	
+R7_OK		LD	A #32
+		OUT	13
+
+		LD	C #10
+R7_NAME		IN	70
+		OUT	13
+		JLOOP 	R7_NAME
+
+		CALL 	STA_MSG
+		IN	70
+		LD	D A
+		IN	70
+		OUT	12
+		LD	A #58
+		OUT	13
+		LD	A D
+		OUT 	12
+		
+		CALL	LEN_MSG
+		IN	70
+		ST	A TAPE_LENG
+		LD	D A
+		IN	70
+		ST	A TAPE_LENG+1
+		OUT	12
+		LD	A #58
+		OUT	13
+		LD	A D
+		OUT 	12
+		LD 	C TAPE_LENG // NAME,ST,LEN END
+
+
+		
+R7_TYP_SWCH	LD	A #10
+		OUT 	13
+			
+		IN	70
+		OUT	13		// GET TYPE
+		LD	D A		// SWITCH(CASE)
+
+		LD	A #32
+		OUT	13
+
+		LD 	A D
+		SUB	A #84
+		JZ	R7_T_TYP	// T-FORMAT
+
+		LD 	A D
+		SUB	A #77
+		JZ	R7_M_TYP	// M-FORMAT
+
+		LD 	A D
+		SUB	A #69
+		JZ	R7_E_TYP	// E-FORMAT
+
+		CALL 	ERR_MSG
+		RET			//WRONG FORMAT
+		
+R7_T_TYP	NOP	/////////T-FORMAT///////
+		IN	70
+		OUT	12
+
+		LD	A #32
+		OUT	13
+
+		IN	70
+		OUT	12
+
+		LD	A #32
+		OUT	13
+
+		IN	70
+		ST 	A RL_T_TYP_LEN
+		OUT	12
+
+		LD	C RL_T_TYP_LEN
+R7_T_TYP_LOP	NOP
+		LD	A #32
+		OUT	13
+		
+		IN	70
+		OUT	12
+
+		JLOOP	R7_T_TYP_LOP
+		JUMP	R7_TYP_SWCH	////////
+	
+R7_M_TYP	NOP	/////////M-FORMAT///////
+		
+		LD	C #3
+R7_M_TYP_LOP	IN	70
+		OUT	12
+		LD	A #32
+		OUT	13
+		JLOOP	R7_M_TYP_LOP
+		JUMP	R7_TYP_SWCH 	////////
+
+R7_E_TYP	NOP	/////////E-FORMAT///////
+
+		IN	70
+		LD	D A
+		IN	70
+		OUT	12
+
+		LD	A #58
+		OUT	13
+
+		LD	A D
+		OUT	12	
+
+		LD	A #10
+		OUT	13
+		
+		RET	//////// RL_7 END ////////////
+
+RL_8		TIO	80 // RL_8 START /////////////
+		IN	80
+		OUT	13
+		SUB	A #72
+		JZ	R8_OK
+		CALL 	ERR_MSG
+		RET // ERR OCCURED, 'VIEW BL'END //
+	
+R8_OK		LD	A #32
+		OUT	13
+
+		LD	C #10
+R8_NAME		IN	80
+		OUT	13
+		JLOOP 	R8_NAME
+
+		CALL 	STA_MSG
+		IN	80
+		LD	D A
+		IN	80
+		OUT	12
+		LD	A #58
+		OUT	13
+		LD	A D
+		OUT 	12
+		
+		CALL	LEN_MSG
+		IN	80
+		ST	A TAPE_LENG
+		LD	D A
+		IN	80
+		ST	A TAPE_LENG+1
+		OUT	12
+		LD	A #58
+		OUT	13
+		LD	A D
+		OUT 	12
+		LD 	C TAPE_LENG // NAME,ST,LEN END
+
+
+		
+R8_TYP_SWCH	LD	A #10
+		OUT 	13
+			
+		IN	80
+		OUT	13		// GET TYPE
+		LD	D A		// SWITCH(CASE)
+
+		LD	A #32
+		OUT	13
+
+		LD 	A D
+		SUB	A #84
+		JZ	R8_T_TYP	// T-FORMAT
+
+		LD 	A D
+		SUB	A #77
+		JZ	R8_M_TYP	// M-FORMAT
+
+		LD 	A D
+		SUB	A #69
+		JZ	R8_E_TYP	// E-FORMAT
+
+		CALL 	ERR_MSG
+		RET			//WRONG FORMAT
+		
+R8_T_TYP	NOP	/////////T-FORMAT///////
+		IN	80
+		OUT	12
+
+		LD	A #32
+		OUT	13
+
+		IN	80
+		OUT	12
+
+		LD	A #32
+		OUT	13
+
+		IN	80
+		ST 	A RL_T_TYP_LEN
+		OUT	12
+
+		LD	C RL_T_TYP_LEN
+R8_T_TYP_LOP	NOP
+		LD	A #32
+		OUT	13
+		
+		IN	80
+		OUT	12
+
+		JLOOP	R8_T_TYP_LOP
+		JUMP	R8_TYP_SWCH	////////
+	
+R8_M_TYP	NOP	/////////M-FORMAT///////
+		
+		LD	C #3
+R8_M_TYP_LOP	IN	80
+		OUT	12
+		LD	A #32
+		OUT	13
+		JLOOP	R8_M_TYP_LOP
+		JUMP	R8_TYP_SWCH 	////////
+
+R8_E_TYP	NOP	/////////E-FORMAT///////
+
+		IN	80
+		LD	D A
+		IN	80
+		OUT	12
+
+		LD	A #58
+		OUT	13
+
+		LD	A D
+		OUT	12	
+
+		LD	A #10
+		OUT	13
+		
+		RET	//////// RL_7 END ////////////
+
+MY_VIEWLL       NOP //@@@@@@@@@@@@VIEW_LL_START@@@@@@@@
+//		#pragma C { 
+//               char* cmd  = strtok(BUF);  // "VIEW"
+//                 char* arg1 = strtok(BUF);  // "LL"
+//                 char* arg2 = strtok(BUF); // "50";
+//		}
+		LD	X #0
+		LD	B #0
+LL_CMD_LOOP	LD 	A @BUF
+		SHL	A #4
+		SHR	A #4
+		ST	A %CMD
+
+		ADD	X #1
+		ADD	B #1
+		
+		SUB	A #32
+		JZ	LL_ARG1_LOOP_I
+		JUMP 	LL_CMD_LOOP
+
+LL_ARG1_LOOP_I	SUB	B #1
+		ST	A %CMD
+		LD	B #0
+LL_ARG1_LOOP	LD      A @BUF
+		SHL	A #4
+		SHR	A #4
+                ST      A %ARG1
+
+                ADD     X #1
+		ADD	B #1
+
+		SUB	A #32
+                JZ      LL_ARG2_LOOP_I
+                JUMP 	LL_ARG1_LOOP
+
+LL_ARG2_LOOP_I	SUB	B #1
+		ST	A %ARG1
+		LD	B #0
+LL_ARG2_LOOP    LD      A @BUF  
+		SHL	A #4
+		SHR	A #4
+                ST      A %ARG2
+
+                ADD     X #1
+		ADD	B #1
+
+		SUB	A #0
+		JZ	LL_BUF_0END
+		SUB	A #32
+                JZ 	LL_BUF__END    
+                JUMP 	LL_ARG2_LOOP
+
+
+
+LL_BUF__END	SUB	B #1
+		ST	A %ARG2
+LL_BUF_0END	LD	A ARG2
+		SHL	A #4
+		SHR	A #4
+		SUB	A #48
+		ST	A SET_TAPE
+	
+		LD	X #=C'% CASSETTE NO. '
+		ST	X PTR_PRNT
+
+		LD	X #0
+LL_PRNT_ARG1	LD	A *@PTR_PRNT		
+		SHL	A #4
+		SHR	A #4
+		OUT	13
+
+		ADD	X #1
+		SUB	A #0
+		JZ	LL_ARG1_END
+		JUMP	LL_PRNT_ARG1
+LL_ARG1_END	NOP
+		
+		LD	A SET_TAPE
+		OUT	12
+		LD	A #10
+		OUT	13
+//following is like absloader(st->out)
+		LD	A #0
+		LD	C #10
+LL_TAPE_MULT	ADD	A SET_TAPE
+		JLOOP	LL_TAPE_MULT
+
+		ST	A SET_TAPE
+		LD	D SET_TAPE
+		SUB	D #30
+		JZ	LL_3
+		SUB	D #10
+		JZ	LL_4
+                SUB     D #10
+                JZ      LL_5
+                SUB     D #10
+                JZ      LL_6
+                SUB     D #10
+                JZ      LL_7
+                SUB     D #10
+                JZ      LL_8
+		CALL 	ERR_MSG
+		RET
+
+LL_T_TYP_LEN	RESDBOX	1
+
+LL_3		TIO	30 // LL_3 START /////////////
+		IN	30
+		OUT	13
+		SUB	A #72
+		JZ	L3_OK
+		CALL 	ERR_MSG
+		RET // ERR OCCURED, 'VIEW BL'END //
+	
+L3_OK		LD	A #32
+		OUT	13
+
+		LD	C #10
+L3_NAME		IN	30
+		OUT	13
+		JLOOP 	L3_NAME
+
+		CALL 	STA_MSG
+		IN	30
+		LD	D A
+		IN	30
+		OUT	12
+		LD	A #58
+		OUT	13
+		LD	A D
+		OUT 	12
+		
+		CALL	LEN_MSG
+		IN	30
+		ST	A TAPE_LENG
+		LD	D A
+		IN	30
+		ST	A TAPE_LENG+1
+		OUT	12
+		LD	A #58
+		OUT	13
+		LD	A D
+		OUT 	12
+		LD 	C TAPE_LENG // NAME,ST,LEN END
+
+
+		
+L3_TYP_SWCH	LD	A #10
+		OUT 	13
+			
+		IN	30
+		OUT	13		// GET TYPE
+		LD	D A		// SWITCH(CASE)
+
+		LD	A #32
+		OUT	13
+
+		LD 	A D
+		SUB	A #84
+		JZ	L3_T_TYP	// T-FORMAT
+
+		LD 	A D
+		SUB	A #77
+		JZ	L3_M_TYP	// M-FORMAT
+
+		LD 	A D
+		SUB	A #68
+		JZ	L3_D_TYP	// D-FORMAT
+
+		LD 	A D
+		SUB	A #82
+		JZ	L3_R_TYP	// R-FORMAT
+
+		LD 	A D
+		SUB	A #69
+		JZ	L3_E_TYP	// E-FORMAT
+
+
+		CALL 	ERR_MSG
+		RET			//WRONG FORMAT
+		
+L3_T_TYP	NOP	/////////T-FORMAT///////
+		IN	30
+		OUT	12
+
+		LD	A #32
+		OUT	13
+
+		IN	30
+		OUT	12
+
+		LD	A #32
+		OUT	13
+
+		IN	30
+		ST 	A LL_T_TYP_LEN
+		OUT	12
+
+		LD	C LL_T_TYP_LEN
+L3_T_TYP_LOP	NOP
+		LD	A #32
+		OUT	13
+		
+		IN	30
+		OUT	12
+
+		JLOOP	L3_T_TYP_LOP
+		JUMP	L3_TYP_SWCH	////////
+	
+L3_M_TYP	NOP	/////////M-FORMAT///////
+		
+		LD	C #14
+L3_M_TYP_LOP	IN	30
+		OUT	12
+		LD	A #32
+		OUT	13
+		JLOOP	L3_M_TYP_LOP
+		JUMP	L3_TYP_SWCH 	////////
+
+L3_D_TYP	NOP	/////////D-FORMAT///////
+		LD	C #60	// CHAR 60
+L3_D_LOP	ADD	X #1
+		LD	A X
+		SUB	A #12
+		JN	L3_D_PRNT
+	
+		LD	X #10
+		LD	A #10
+		OUT 	13
+		LD	A #32
+		OUT 	13
+		OUT	13
+
+L3_D_PRNT	IN 	30
+		OUT	13
+		JLOOP	L3_D_LOP		
+	
+		JUMP	L3_TYP_SWCH 	////////
+
+L3_R_TYP	NOP	/////////R-FORMAT///////
+		LD	C #50	// CHAR 50
+		LD	X #0
+L3_R_LOP	ADD	X #1
+		LD	A X
+		SUB	A #10
+		JN	L3_R_PRNT
+	
+		LD	X #0
+		LD	A #10
+		OUT 	13
+		LD	A #32
+		OUT 	13
+		OUT	13
+
+L3_R_PRNT	IN 	30
+		OUT	13
+		
+		JLOOP	L3_R_LOP
+		JUMP	L3_TYP_SWCH 	////////
+
+L3_E_TYP	NOP	/////////E-FORMAT///////
+
+		IN	30
+		LD	D A
+		IN	30
+		OUT	12
+
+		LD	A #58
+		OUT	13
+
+		LD	A D
+		OUT	12	
+
+		LD	A #10
+		OUT	13
+		
+		RET	//////// LL_3 END ////////////
+LL_4		NOP	
+LL_5		NOP
+LL_6		NOP
+LL_7		NOP
+LL_8		NOP
+		RET
+
+///////////////////// PRINT MESSAGE ///////////////////
+
+
+STA_MSG         NOP //////// PRINT START MESSAGE //////
+LD              X #=C', START AT '
+                ST      X PTR_PRNT
+
+                LD      X #0
+PRNT_STA        LD      A *@PTR_PRNT
+                SHL     A #4
+                SHR     A #4
+                OUT     13
+
+                ADD     X #1
+                SUB     A #0
+                JZ      STA_END
+                JUMP    PRNT_STA
+STA_END         RET /////////// STA_MSG END ///////////
+
+LEN_MSG         NOP /////// PRINT LENGTH MESSAGE //////
+LD              X #=C', AND LENGTH IS '
+                ST      X PTR_PRNT
+
+                LD      X #0
+PRNT_LEN        LD      A *@PTR_PRNT
+                SHL     A #4
+                SHR     A #4
+                OUT     13
+
+                ADD     X #1
+                SUB     A #0
+                JZ      LEN_END
+                JUMP    PRNT_LEN
+LEN_END         RET /////////// LEN_MSG END ///////////
+
+ERR_MSG		NOP ///////// PRINT ERR MESSAGE ///////
+LD     		X #=C'...OH! THIS IS WRONG TAPE !!'
+                ST      X PTR_PRNT
+
+                LD      X #0
+PRNT_ERR    	LD      A *@PTR_PRNT
+                SHL     A #4
+                SHR     A #4
+                OUT     13
+
+                ADD     X #1
+                SUB     A #0
+                JZ      ERR_END
+                JUMP    PRNT_ERR
+ERR_END    	LD	A #10
+		OUT 13
+		RET /////////// ERR_MSG END //////////
+
+		
+                 LTORG
+BUF              RESBOX  100
+STACK            RESDBOX 200
+STACK_BTM        EQU     $
+                 END
+
+
